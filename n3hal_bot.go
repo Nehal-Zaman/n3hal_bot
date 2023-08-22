@@ -21,6 +21,7 @@ This bot is created by Nehal Zaman (` + "`n3hal_`" + `) for recon automation.
 
 1. ` + "`run <passcode> <cmd>`" + `: to run a command.
 2. ` + "`subenum <passcode> <target>`" + `: start a subdomain enumneration of target.
+3. ` + "`portscan <passcode> <target>`" + `: start a port scan of target.
 `
 
 func RunCommand(passcode string, server_passcode string, cmd string) string {
@@ -46,7 +47,17 @@ func printToStdout(user string, msg string) {
 }
 
 func printBanner() {
-	fmt.Println(colors.CyanBold("n3hal_bot") + ":" + colors.WhiteBold(" telegram bot for automated recon"))
+	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	version_raw, err := cmd.Output()
+	version_str := ""
+
+	if err != nil {
+		version_str = "unknown"
+	} else {
+		version_str = strings.TrimSpace(string(version_raw))
+	}
+
+	fmt.Println(colors.CyanBold("n3hal_bot") + colors.GreenBold(" [ ") + colors.BlueBold(version_str) + colors.GreenBold(" ]") + ":" + colors.WhiteBold(" telegram bot for automated recon"))
 }
 
 func getCliArgs() int {
@@ -117,8 +128,21 @@ func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, api
 			api.SendMessage("Invalid number of arguments to 'subenum'", u.ChatID(), nil)
 		} else {
 			cmd := scripts_path + "/subenum/subenum.sh " + args[2]
-			api.SendMessage("Target "+args[2]+" is added for recon by "+u.Message.From.Username, u.ChatID(), nil)
+			api.SendMessage("Target "+args[2]+" is added for subdomain enumeration by "+u.Message.From.Username, u.ChatID(), nil)
 			output := fmt.Sprintf("**Subdomains discovered for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, cmd))
+			api.SendMessage(output, u.ChatID(), &echotron.MessageOptions{ParseMode: "Markdown"})
+		}
+	}
+
+	// to start a port scan of a target
+	if strings.HasPrefix(u.Message.Text, "portscan ") {
+		args := strings.Split(u.Message.Text, " ")
+		if len(args) < 3 {
+			api.SendMessage("Invalid number of arguments to 'portscan'", u.ChatID(), nil)
+		} else {
+			cmd := scripts_path + "/portscan/portscan.sh " + args[2]
+			api.SendMessage("Target "+args[2]+" is added for port scanning by "+u.Message.From.Username, u.ChatID(), nil)
+			output := fmt.Sprintf("**Port scan results for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, cmd))
 			api.SendMessage(output, u.ChatID(), &echotron.MessageOptions{ParseMode: "Markdown"})
 		}
 	}
