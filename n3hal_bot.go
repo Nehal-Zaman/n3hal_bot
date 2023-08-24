@@ -24,9 +24,25 @@ This bot is created by Nehal Zaman (` + "`n3hal_`" + `) for recon automation.
 3. ` + "`portscan <passcode> <target>`" + `: start a port scan of target.
 `
 
-func RunCommand(passcode string, server_passcode string, cmd string) string {
-	if server_passcode != passcode {
-		return "Invalid passcode"
+func isValidUser(raw_users, curr_user string) bool {
+	users := strings.Split(raw_users, "-")
+	for _, user := range users {
+		if user == curr_user {
+			return true
+		}
+	}
+	return false
+}
+
+func RunCommand(passcode string, server_passcode string, user_skip string, curr_user string, cmd string) string {
+	valid := false
+
+	if isValidUser(user_skip, curr_user) || (server_passcode == passcode) {
+		valid = true
+	}
+
+	if !valid {
+		return "Invalid passcode, OR you are not just the right person! :)"
 	} else {
 		cmd_to_run := exec.Command("bash", "-c", cmd)
 
@@ -79,6 +95,7 @@ func main() {
 	token := os.Getenv("BOT_KEY")
 	run_key := os.Getenv("RUN_KEY")
 	scripts_path := os.Getenv("SCRIPTS_PATH")
+	user_skip := os.Getenv("SKIP_USER")
 	threads := getCliArgs()
 
 	api := echotron.NewAPI(token)
@@ -89,7 +106,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for u := range msgChan {
-				analyzeMessage(u, run_key, scripts_path, api)
+				analyzeMessage(u, run_key, scripts_path, user_skip, api)
 			}
 		}()
 	}
@@ -103,7 +120,7 @@ func main() {
 
 }
 
-func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, api echotron.API) {
+func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, user_skip string, api echotron.API) {
 	printToStdout(u.Message.From.Username, u.Message.Text)
 
 	if u.Message.Text == "/start" {
@@ -117,7 +134,7 @@ func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, api
 			api.SendMessage("Invalid number of arguments to 'run'", u.ChatID(), nil)
 		} else {
 			cmd := strings.Join(args[2:], " ")
-			api.SendMessage(RunCommand(args[1], run_key, cmd), u.ChatID(), nil)
+			api.SendMessage(RunCommand(args[1], run_key, user_skip, u.Message.From.Username, cmd), u.ChatID(), nil)
 		}
 	}
 
@@ -129,7 +146,7 @@ func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, api
 		} else {
 			cmd := scripts_path + "/subenum/subenum.sh " + args[2]
 			api.SendMessage("Target "+args[2]+" is added for subdomain enumeration by "+u.Message.From.Username, u.ChatID(), nil)
-			output := fmt.Sprintf("**Subdomains discovered for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, cmd))
+			output := fmt.Sprintf("**Subdomains discovered for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, user_skip, u.Message.From.Username, cmd))
 			api.SendMessage(output, u.ChatID(), &echotron.MessageOptions{ParseMode: "Markdown"})
 		}
 	}
@@ -142,7 +159,7 @@ func analyzeMessage(u *echotron.Update, run_key string, scripts_path string, api
 		} else {
 			cmd := scripts_path + "/portscan/portscan.sh " + args[2]
 			api.SendMessage("Target "+args[2]+" is added for port scanning by "+u.Message.From.Username, u.ChatID(), nil)
-			output := fmt.Sprintf("**Port scan results for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, cmd))
+			output := fmt.Sprintf("**Port scan results for __%v__:**\n\n```\n%v\n```", args[2], RunCommand(args[1], run_key, user_skip, u.Message.From.Username, cmd))
 			api.SendMessage(output, u.ChatID(), &echotron.MessageOptions{ParseMode: "Markdown"})
 		}
 	}
